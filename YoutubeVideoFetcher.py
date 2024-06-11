@@ -1,6 +1,7 @@
 import os
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
+import json
 
 class YoutubeVideoFetcher:
     def __init__(self):
@@ -41,9 +42,19 @@ class YoutubeVideoFetcher:
         transcript = YouTubeTranscriptApi.get_transcript(video_id)
         return transcript
     
+    # Converts the transcript into a single string
+    def convert_transcript(self, transcript):
+        # Extract the 'text' values from each dictionary and join them into a single line
+        single_line_text = ' '.join([entry['text'] for entry in transcript])
+
+        return single_line_text
+
+
+    
 if __name__ == "__main__":
     fetcher = YoutubeVideoFetcher()
     videos = fetcher.fetch_videos_by_channel("UC7kCeZ53sli_9XwuQeFxLqw")
     breakpoint()
-    captions = fetcher.fetch_transcript('3JZ_D3ELwOQ')
+    captions = fetcher.fetch_transcript('GZd212F2Kmg')
+    converted_transcript = fetcher.convert_transcript(captions)
     
