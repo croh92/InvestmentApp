@@ -4,10 +4,24 @@ import os
 import requests
 
 class PodcastFetcher:
-    def __init__(self, api_key):
-        self.api_key = api_key
+    def __init__(self):
+        self.api_key = os.environ.get("LISTEN_NOTES_API_KEY")
         self.base_url = "https://listen-api.listennotes.com/api/v2"
 
+    def get_podcast_episodes(self, podcast_id):
+        headers = {
+            "X-ListenAPI-Key": self.api_key
+        }
+        url = f"{self.base_url}/podcasts/{podcast_id}"
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            return data['episodes']
+        else:
+            print(f"Error: {response.status_code}. {response.text}")
+            return None
+    
     def get_episode_transcript(self, episode_id):
         headers = {
             'X-ListenAPI-Key': self.api_key
@@ -21,31 +35,31 @@ class PodcastFetcher:
         else:
             response.raise_for_status()
 
-    def search_podcasts(self, query, type='episode'):
+    def get_episode_details(self, episode_id):
         headers = {
             'X-ListenAPI-Key': self.api_key
         }
         params = {
-            'q': query,
-            'type': type
+            'show_transcript': 1
         }
-        url = f"{self.base_url}/search"
-        response = requests.get(url, headers=headers, params=params)
+        url = f"{self.base_url}/episodes/{episode_id}"
+        response = requests.get(url, headers=headers)
         
         if response.status_code == 200:
-            search_results = response.json()
-            return search_results.get('results', [])
+            episode_data = response.json()
+            return episode_data
         else:
-            response.raise_for_status()
+            print(f"Error: {response.status_code}. {response.text}")
+            return None
 
 # Example usage
 if __name__ == "__main__":
-    api_key = "YOUR_LISTEN_NOTES_API_KEY"
-    fetcher = PodcastFetcher(api_key)
+    fetcher = PodcastFetcher()
 
     # Search for a podcast episode
-    search_query = "technology"
-    episodes = fetcher.search_podcasts(search_query)
+    podcast_id = "0eWaLuirNTJ"
+    breakpoint()
+    episodes = fetcher.get_podcast_episodes(podcast_id)
     if episodes:
         first_episode_id = episodes[0]['id']
         
