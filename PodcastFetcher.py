@@ -1,10 +1,12 @@
 import requests
 import os
+from openai import OpenAI
 
 class PodcastFetcher:
     def __init__(self):
         self.base_url = "https://itunes.apple.com"
 
+    # Gets all podcast episodes for a given podcast.
     def get_podcast_episodes(self, podcast_id):
         url = f"{self.base_url}/lookup"
         params = {
@@ -23,6 +25,29 @@ class PodcastFetcher:
         else:
             print(f"Error: {response.status_code}")
             return []
+    
+    # Determines if a podcast episode is related to disruptive technologies
+    def is_disruptive_technology(self, title, description):
+        openai_client = OpenAI(
+            api_key=self.api_key,
+        )
+
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": f"Title: {title}\nDescription: {description}\n\nQuestion: Is this podcast episode related to disruptive technologies such as artificial intelligence, blockchain, IoT, autonomous vehicles, quantum computing, or other similar technologies? Answer with yes or no."}
+        ]
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=messages,
+            max_tokens=10,
+            n=1,
+            stop=None,
+            temperature=0.5,
+        )
+
+        answer = response.choices[0].message.content.strip().lower()
+        return answer == "yes"
 
     def download_episode(self, episode):
         episode_url = episode.get('episodeUrl')
