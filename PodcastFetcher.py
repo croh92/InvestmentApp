@@ -74,6 +74,17 @@ class PodcastFetcher:
                 print(f"Failed to download {filename}. Content type: {content_type}")
         else:
             print(f"Episode URL not found in episode metadata.")
+    
+    def filter_and_download_episodes(self):
+        episodes = self.get_podcast_episodes(podcast_id)
+        if episodes:
+            for episode in episodes:
+                title = episode.get('trackName', 'Unknown Title')
+                description = episode.get('description', '')
+                if self.is_disruptive_technology(title, description):
+                    audio_file_path = self.download_episode(episode)
+        else:
+            print("No episodes found or access is restricted.")
 
 # Example usage
 if __name__ == "__main__":
@@ -81,10 +92,5 @@ if __name__ == "__main__":
     podcast_id = "1502871393"
 
     # Fetch episodes for the podcast
-    episodes = fetcher.get_podcast_episodes(podcast_id)
-    breakpoint()
-    if episodes:
-        for episode in episodes:
-            fetcher.download_episode(episode)
-    else:
-        print("No episodes found or access is restricted.")
+    episodes = fetcher.filter_and_download_episodes(podcast_id)
+    breakpoint();
