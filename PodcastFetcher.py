@@ -5,6 +5,7 @@ from openai import OpenAI
 class PodcastFetcher:
     def __init__(self):
         self.base_url = "https://itunes.apple.com"
+        self.api_key = os.environ.get("OPEN_API_KEY")
 
     # Gets all podcast episodes for a given podcast.
     def get_podcast_episodes(self, podcast_id):
@@ -75,7 +76,7 @@ class PodcastFetcher:
         else:
             print(f"Episode URL not found in episode metadata.")
     
-    def filter_and_download_episodes(self):
+    def filter_and_download_episodes(self, podcast_id):
         episodes = self.get_podcast_episodes(podcast_id)
         if episodes:
             for episode in episodes:
