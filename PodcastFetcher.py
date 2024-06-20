@@ -1,70 +1,65 @@
 import requests
 import os
 
-import requests
-
 class PodcastFetcher:
     def __init__(self):
-        self.api_key = os.environ.get("LISTEN_NOTES_API_KEY")
-        self.base_url = "https://listen-api.listennotes.com/api/v2"
+        self.base_url = "https://itunes.apple.com"
 
     def get_podcast_episodes(self, podcast_id):
-        headers = {
-            "X-ListenAPI-Key": self.api_key
+        url = f"{self.base_url}/lookup"
+        params = {
+            'id': podcast_id,
+            'entity': 'podcastEpisode',
+            'limit': 20  # Adjust limit as needed
         }
-        url = f"{self.base_url}/podcasts/{podcast_id}"
-        response = requests.get(url, headers=headers)
-        
+        response = requests.get(url, params=params)
         if response.status_code == 200:
             data = response.json()
-            return data['episodes']
+            if 'results' in data and data['resultCount'] > 0:
+                # Return all results except the first one, which is the podcast info
+                return data['results'][1:] if data['resultCount'] > 1 else []
+            else:
+                return []
         else:
-            print(f"Error: {response.status_code}. {response.text}")
-            return None
-    
-    def get_episode_transcript(self, episode_id):
-        headers = {
-            'X-ListenAPI-Key': self.api_key
-        }
-        url = f"{self.base_url}/episodes/{episode_id}/transcripts"
-        response = requests.get(url, headers=headers)
-        
-        if response.status_code == 200:
-            transcript_data = response.json()
-            return transcript_data.get('results', [])
-        else:
-            response.raise_for_status()
+            print(f"Error: {response.status_code}")
+            return []
 
-    def get_episode_details(self, episode_id):
-        headers = {
-            'X-ListenAPI-Key': self.api_key
-        }
-        params = {
-            'show_transcript': 1
-        }
-        url = f"{self.base_url}/episodes/{episode_id}"
-        response = requests.get(url, headers=headers)
-        
-        if response.status_code == 200:
-            episode_data = response.json()
-            return episode_data
+    def download_episode(self, episode):
+        episode_url = episode.get('episodeUrl')
+        if episode_url:
+            # Construct the filename using the episode's title
+            title = episode.get('trackName', 'Unknown Episode')
+            filename = f"{title}.mp3".replace("/", "-")  # Replace slashes to avoid file path issues
+
+            response = requests.get(episode_url, allow_redirects=True)
+            final_url = response.url
+            
+            # Verify the content type of the final URL
+            head_response = requests.head(final_url)
+            content_type = head_response.headers.get('Content-Type', '')
+
+            if head_response.status_code == 200 and 'audio/mpeg' in content_type:
+                response = requests.get(final_url, stream=True)
+                with open(filename, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=1024):
+                        if chunk:  # filter out keep-alive new chunks
+                            f.write(chunk)
+                print(f"Downloaded {filename}")
+            else:
+                print(f"Failed to download {filename}. Content type: {content_type}")
         else:
-            print(f"Error: {response.status_code}. {response.text}")
-            return None
+            print(f"Episode URL not found in episode metadata.")
 
 # Example usage
 if __name__ == "__main__":
     fetcher = PodcastFetcher()
+    podcast_id = "1502871393"
 
-    # Search for a podcast episode
-    podcast_id = "0eWaLuirNTJ"
-    breakpoint()
+    # Fetch episodes for the podcast
     episodes = fetcher.get_podcast_episodes(podcast_id)
+    breakpoint()
     if episodes:
-        first_episode_id = episodes[0]['id']
-        
-        # Fetch transcript for the first episode found
-        transcript = fetcher.get_episode_transcript(first_episode_id)
-        print(transcript)
+        for episode in episodes:
+            fetcher.download_episode(episode)
     else:
-        print("No episodes found.")
+        print("No episodes found or access is restricted.")
