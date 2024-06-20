@@ -94,4 +94,3 @@ if __name__ == "__main__":
 
     # Fetch episodes for the podcast
     episodes = fetcher.filter_and_download_episodes(podcast_id)
-    breakpoint();
