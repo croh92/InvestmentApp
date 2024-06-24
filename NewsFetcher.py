@@ -4,7 +4,10 @@ from openai import OpenAI
 from datetime import datetime
 from MITTechReviewScraper import MITTechReviewScraper
 from DocumentEncoder import DocumentEncoder
-from llama_index import GPTIndex, Document
+from llama_index.core import VectorStoreIndex, Document, StorageContext
+from llama_index.vector_stores.chroma import ChromaVectorStore
+from llama_index.embeddings.openai import OpenAIEmbedding
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 import chromadb
 
 class NewsFetcher:
@@ -24,7 +27,6 @@ class NewsFetcher:
 
         mit_scraper = MITTechReviewScraper()
         mit_articles = mit_scraper.get_latest_news()
-        breakpoint()
 
         combined_articles = []
         for article in news_api_articles:
@@ -68,10 +70,22 @@ class NewsFetcher:
         return filtered_articles
     
     # Saves the news into a vector DB to generate insights off of it later
-    def save_news(news):
-        client = chromadb.Client()
-        document_encoder = DocumentEncoder()
-        collection = client.create_collection(name="news_articles")
+    def save_news(self, news):
+        # Initialize Chroma client
+        chroma_client = chromadb.PersistentClient(path="./chroma_db")
+        
+        # Create or get the collection
+        collection_name = "news_articles"
+        chroma_collection = chroma_client.get_or_create_collection(name=collection_name)
+
+        # Create Chroma vector store
+        vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+
+        # Create storage context
+        storage_context = StorageContext.from_defaults(vector_store=vector_store)
+
+        # Initialize the embedding model
+        embed_model = HuggingFaceEmbedding()
 
         # Prepare documents for indexing with timestamps
         documents = [
@@ -84,23 +98,43 @@ class NewsFetcher:
             for i, article in enumerate(news)
         ]
 
-        # Encode and store documents in Chroma
-        for doc in documents:
-            embedding = document_encoder.encode(doc["text"])
-            metadata = {"source": doc["source"], "timestamp": doc["timestamp"].isoformat()}
-            collection.insert(embedding, doc_id=doc["id"], metadata=metadata)
+        # Create documents from news articles
+        documents = []
+        for i, article in enumerate(news):
+            doc_text = f"Title: {article['title']}\nDescription: {article['description']}\nContent: {article['content']}"
+            doc_metadata = {
+                "source": article['source'],
+                "timestamp": article['timestamp'].isoformat(),
+                "url": article['url']
+            }
+            documents.append(Document(text=doc_text, metadata=doc_metadata))
 
         # Initialize LlamaIndex
-        index = GPTIndex(vector_store=collection)
+        index = VectorStoreIndex.from_documents(
+            documents,
+            storage_context=storage_context,
+            embed_model=embed_model
+        )
 
-        # Add documents to LlamaIndex
-        for doc in documents:
-            document = Document(doc_id=doc["id"], text=doc["text"], metadata={"source": doc["source"], "timestamp": doc["timestamp"].isoformat()})
-            index.add(document)
+        # Persist the index
+        index.storage_context.persist()
+
+        return index
 
     
 if __name__ == "__main__":
     fetcher = NewsFetcher()
     news = fetcher.fetch_news()
     filtered_news = fetcher.filter_news(news)
+    fetcher.save_news(filtered_news)
+
+    chroma_client = chromadb.PersistentClient(path="./chroma_db")
+    collection = chroma_client.get_collection(name="news_articles")
+
+    # Get the count of items in the collection
+    print(f"Number of items in collection: {collection.count()}")
+
+    # Retrieve a few items
+    results = collection.peek(limit=5)
+    print(f"Sample items: {results}")
     breakpoint()
