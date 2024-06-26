@@ -3,7 +3,6 @@ import os
 from openai import OpenAI
 from datetime import datetime
 from MITTechReviewScraper import MITTechReviewScraper
-from DocumentEncoder import DocumentEncoder
 from llama_index.core import VectorStoreIndex, Document, StorageContext
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.embeddings.openai import OpenAIEmbedding
@@ -85,18 +84,7 @@ class NewsFetcher:
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
         # Initialize the embedding model
-        embed_model = HuggingFaceEmbedding()
-
-        # Prepare documents for indexing with timestamps
-        documents = [
-            {
-                "id": str(i),
-                "text": article['description'],
-                "source": article['source'],
-                "timestamp": article['timestamp']
-            }
-            for i, article in enumerate(news)
-        ]
+        embed_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
         # Create documents from news articles
         documents = []
@@ -136,5 +124,22 @@ if __name__ == "__main__":
 
     # Retrieve a few items
     results = collection.peek(limit=5)
+
+    # Use the same embedding model as when you saved the data
+    embed_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+    # Load the existing index
+    chroma_client = chromadb.PersistentClient(path="./chroma_db")
+    chroma_collection = chroma_client.get_collection("news_articles")
+    vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+    storage_context = StorageContext.from_defaults(vector_store=vector_store)
+    index = VectorStoreIndex.from_vector_store(vector_store, embed_model=embed_model)
+
+    # Create a query engine
+    query_engine = index.as_query_engine()
+
+    # Perform a test query
+    response = query_engine.query("What are some recent developments in AI?")
+    print(response)
     print(f"Sample items: {results}")
     breakpoint()
