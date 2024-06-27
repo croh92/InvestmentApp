@@ -5,7 +5,7 @@ from openai import OpenAI
 class PodcastFetcher:
     def __init__(self):
         self.base_url = "https://itunes.apple.com"
-        self.api_key = os.environ.get("OPEN_API_KEY")
+        self.api_key = os.environ.get("OPENAI_API_KEY")
 
     # Gets all podcast episodes for a given podcast.
     def get_podcast_episodes(self, podcast_id):

@@ -22,16 +22,23 @@ class NewsFetcher:
         "hacker-news",
         "techradar",
         "the-next-web",
+        "bloomberg"
         ]
         self.language = "en"
         self.news_api_key = os.environ['NEWS_API_KEY']
+        
+        # Initialize Chroma
+        self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
+        self.collection_name = "news_articles"
+        self.chroma_collection = self.chroma_client.get_or_create_collection(name=self.collection_name)
 
     # Fetches news articles from News API and MIT Technology Review
     def fetch_news(self):
-        news_api_url = f"https://newsapi.org/v2/top-headlines"
+        news_api_url = f"https://newsapi.org/v2/everything"
         news_api_params = {
             "sources": ",".join(self.news_api_sources),
             "language": self.language,
+            "q": "technology",
             "apiKey": self.news_api_key
         }
         response = requests.get(news_api_url, params=news_api_params)
@@ -69,18 +76,32 @@ class NewsFetcher:
     def filter_news(self, news):
         openai_client = OpenAI(
             # This is the default and can be omitted
-            api_key=os.environ.get("OPEN_API_KEY"),
+            api_key=os.environ.get("OPENAI_API_KEY"),
         )
         filtered_articles = []
 
         for article in news:
+            # Combine title and description to create a unique identifier
+            content = f"{article['title']}|{article['description']}"
+            article_id = hashlib.md5(content.encode()).hexdigest()
+
+            # Check if the article already exists in the collection by querying the title
+            existing_docs = self.chroma_collection.get(
+                where={"id": article_id}
+            )
+            
+            # If it already exists, don't query Open AI. Just skip to the next article.
+            if existing_docs['documents']:
+                print(f"Article already exists: {article['title']}")
+                continue  # Skip this article since it already exists
+            
             messages = [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": f"Is the following article related to disruptive technologies? Example disruptive technologies include but are not limited to artificial intelligence, blockchain, IoT, autonomous vehicles, and quantum computing. Answer with yes or no.\n\n{article}"}
             ]
     
             response = openai_client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-3.5-turbo",
                 messages=messages,
                 max_tokens=1500,
                 n=1,
@@ -96,14 +117,12 @@ class NewsFetcher:
     # Saves the news into a vector DB to generate insights off of it later
     def save_news(self, news):
         # Initialize Chroma client
-        chroma_client = chromadb.PersistentClient(path="./chroma_db")
+        chroma_client = self.chroma_client
         
-        # Create or get the collection
-        collection_name = "news_articles"
-        chroma_collection = chroma_client.get_or_create_collection(name=collection_name)
+        chroma_collection = chroma_client.get_or_create_collection(name=self.collection_name)
 
         # Create Chroma vector store
-        vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+        vector_store = ChromaVectorStore(chroma_collection=self.chroma_collection)
 
         # Create storage context
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
@@ -167,7 +186,7 @@ if __name__ == "__main__":
     print(f"Number of items in collection: {collection.count()}")
 
     # Retrieve a few items
-    results = collection.peek(limit=20)
+    results = collection.peek(limit=36)
 
     # Use the same embedding model as when you saved the data
     embed_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
