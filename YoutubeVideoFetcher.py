@@ -180,7 +180,6 @@ class YoutubeVideoFetcher:
             # Persist the index
             index.storage_context.persist()
 
-            breakpoint()
             print(f"Added {len(new_documents)} new videos to the index.")
 
         print(f"Skipped {skipped_count} videos that already exist in the index.")
