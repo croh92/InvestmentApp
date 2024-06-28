@@ -107,7 +107,7 @@ class YoutubeVideoFetcher:
                 print(f"Video already exists: {video['title']}")
                 continue  # Skip this article since it already exists
 
-            # Only use Open AI to check if the video is related to disruptive technologies if doesnt exist in vector DB
+            # Only use Open AI to check if the video is related to disruptive technologies if it doesnt already exist in vector DB. Saves $$.
             if self.is_disruptive_technology(title, description):
                 filtered_videos.append(video)
 
